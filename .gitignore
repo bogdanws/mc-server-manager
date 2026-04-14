@@ -1,0 +1,34 @@
+# Compiled output
+out/
+*.class
+
+# Log files
+*.log
+
+# Package files
+*.jar
+*.war
+*.ear
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Project runtime artifacts
+audit.csv
+mcserver.db
+mcserver.db-journal
+
+# Dependency directory (if you download jars manually, track lib/ in git but not the jars if preferred)
+# lib/*.jar
+
+# Build scripts output
+sources.txt
