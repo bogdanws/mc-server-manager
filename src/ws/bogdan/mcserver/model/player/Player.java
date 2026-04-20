@@ -12,6 +12,7 @@ public abstract class Player {
     protected String username;
     protected final LocalDateTime joinDate;
     protected long playtimeMinutes;
+    protected long xp;
     protected World currentWorld;
     protected double balance;
     protected Rank rank;
@@ -40,6 +41,14 @@ public abstract class Player {
 
     public long getPlaytimeMinutes() {
         return playtimeMinutes;
+    }
+
+    public long getXp() {
+        return xp;
+    }
+
+    public void addXp(long amount) {
+        this.xp += amount;
     }
 
     public World getCurrentWorld() {
