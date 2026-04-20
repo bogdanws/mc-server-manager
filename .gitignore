@@ -19,6 +19,11 @@ target/
 *.swo
 *~
 
+# Eclipse / VS Code Java extension
+.classpath
+.project
+.settings/
+
 # OS files
 .DS_Store
 Thumbs.db
