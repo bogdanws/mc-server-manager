@@ -1,5 +1,6 @@
 package ws.bogdan.mcserver.service;
 
+import ws.bogdan.mcserver.audit.AuditService;
 import ws.bogdan.mcserver.model.Achievement;
 import ws.bogdan.mcserver.model.player.Player;
 import java.util.HashSet;
@@ -13,10 +14,12 @@ public class AchievementService {
     }
 
     public void registerAchievement(Achievement a) {
+        AuditService.getInstance().logAction("REGISTER_ACHIEVEMENT");
         state.getAchievements().put(a.getId(), a);
     }
 
     public void grantAchievement(Player p, Achievement a) {
+        AuditService.getInstance().logAction("GRANT_ACHIEVEMENT");
         if (a.getParentAchievement() != null) {
             Set<Achievement> playerAchievements = state.getPlayerAchievements().get(p);
             if (playerAchievements == null || !playerAchievements.contains(a.getParentAchievement())) {

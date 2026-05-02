@@ -1,5 +1,6 @@
 package ws.bogdan.mcserver.service;
 
+import ws.bogdan.mcserver.audit.AuditService;
 import ws.bogdan.mcserver.exception.PermissionDeniedException;
 import ws.bogdan.mcserver.exception.PlayerNotFoundException;
 import ws.bogdan.mcserver.model.Inventory;
@@ -20,6 +21,7 @@ public class PlayerService {
     }
 
     public Player addPlayer(Player p) {
+        AuditService.getInstance().logAction("ADD_PLAYER");
         state.getPlayers().put(p.getUuid(), p);
         state.getLeaderboard().add(p);
         state.getPlayersByRank()
@@ -45,12 +47,14 @@ public class PlayerService {
     }
 
     public void addPlaytime(Player p, long minutes) {
+        AuditService.getInstance().logAction("ADD_PLAYTIME");
         state.getLeaderboard().remove(p);
         p.addPlaytime(minutes);
         state.getLeaderboard().add(p);
     }
 
     public void promoteTo(StaffMember actor, Player target, Rank newRank) {
+        AuditService.getInstance().logAction("PROMOTE_PLAYER");
         if (actor.getPermissionLevel() < 50) {
             throw new PermissionDeniedException(
                     actor.getUsername() + " does not have permission to promote players");
@@ -67,6 +71,7 @@ public class PlayerService {
     }
 
     public List<Player> topNByPlaytime(int n) {
+        AuditService.getInstance().logAction("TOP_N_PLAYTIME");
         List<Player> result = new ArrayList<>();
         for (Player p : state.getLeaderboard()) {
             if (result.size() >= n)

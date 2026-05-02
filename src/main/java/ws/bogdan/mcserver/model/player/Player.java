@@ -27,6 +27,17 @@ public abstract class Player {
         this.currentWorld = null;
     }
 
+    // reconstructie la incarcare din baza de date
+    protected Player(UUID uuid, String username, Rank rank, LocalDateTime joinDate) {
+        this.uuid = Objects.requireNonNull(uuid, "uuid must not be null");
+        this.username = Objects.requireNonNull(username, "username must not be null");
+        this.rank = Objects.requireNonNull(rank, "rank must not be null");
+        this.joinDate = Objects.requireNonNull(joinDate, "joinDate must not be null");
+        this.playtimeMinutes = 0;
+        this.balance = 0.0;
+        this.currentWorld = null;
+    }
+
     public UUID getUuid() {
         return uuid;
     }

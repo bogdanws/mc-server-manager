@@ -1,5 +1,6 @@
 package ws.bogdan.mcserver.service;
 
+import ws.bogdan.mcserver.audit.AuditService;
 import ws.bogdan.mcserver.model.Session;
 import ws.bogdan.mcserver.model.World;
 import ws.bogdan.mcserver.model.player.Player;
@@ -15,6 +16,7 @@ public class SessionService {
     }
 
     public Session login(Player p, World w) {
+        AuditService.getInstance().logAction("LOGIN_PLAYER");
         w.addPlayer(p);
         p.setCurrentWorld(w);
         Session session = new Session(p, w);
@@ -23,6 +25,7 @@ public class SessionService {
     }
 
     public void logout(Player p) {
+        AuditService.getInstance().logAction("LOGOUT_PLAYER");
         Iterator<Session> it = state.getActiveSessions().iterator();
         while (it.hasNext()) {
             Session session = it.next();

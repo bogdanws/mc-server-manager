@@ -23,6 +23,14 @@ import ws.bogdan.mcserver.model.player.Player;
 import ws.bogdan.mcserver.model.player.RegularPlayer;
 import ws.bogdan.mcserver.model.player.VIPPlayer;
 import ws.bogdan.mcserver.exception.PluginDependencyException;
+import ws.bogdan.mcserver.persistence.AchievementDAO;
+import ws.bogdan.mcserver.persistence.DatabaseConnection;
+import ws.bogdan.mcserver.persistence.ItemDAO;
+import ws.bogdan.mcserver.persistence.PlayerDAO;
+import ws.bogdan.mcserver.persistence.PluginDAO;
+import ws.bogdan.mcserver.persistence.RankDAO;
+import ws.bogdan.mcserver.persistence.Repository;
+import ws.bogdan.mcserver.persistence.WorldDAO;
 import ws.bogdan.mcserver.service.AchievementService;
 import ws.bogdan.mcserver.service.EconomyService;
 import ws.bogdan.mcserver.service.InventoryService;
@@ -32,9 +40,15 @@ import ws.bogdan.mcserver.service.ServerState;
 import ws.bogdan.mcserver.service.SessionService;
 import ws.bogdan.mcserver.service.StaffService;
 import ws.bogdan.mcserver.service.WorldService;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 public class Main {
@@ -48,6 +62,13 @@ public class Main {
     static PluginService pluginService;
     static SessionService sessionService;
     static StaffService staffService;
+
+    static RankDAO rankDAO;
+    static WorldDAO worldDAO;
+    static PlayerDAO playerDAO;
+    static ItemDAO itemDAO;
+    static PluginDAO pluginDAO;
+    static AchievementDAO achievementDAO;
 
     // Players
     static Player alice, bob, charlie, diana, mod, admin;
@@ -70,6 +91,16 @@ public class Main {
     static Achievement firstLogin, firstKill, legendary;
 
     public static void main(String[] args) {
+        System.out.println("\n=== INIT DATABASE ===");
+        DatabaseConnection.getInstance().runSchema();
+        rankDAO = RankDAO.getInstance();
+        worldDAO = WorldDAO.getInstance();
+        playerDAO = PlayerDAO.getInstance();
+        itemDAO = ItemDAO.getInstance();
+        pluginDAO = PluginDAO.getInstance();
+        achievementDAO = AchievementDAO.getInstance();
+        System.out.println("Database initialised");
+
         state = new ServerState();
         playerService = new PlayerService(state);
         worldService = new WorldService(state);
@@ -115,6 +146,111 @@ public class Main {
 
         System.out.println("\n=== LOGOUT PLAYERS ===");
         logoutPlayers();
+
+        System.out.println("\n=== PERSIST TO DATABASE ===");
+        persistAll();
+
+        System.out.println("\n=== CRUD DEMO ===");
+        crudDemo();
+
+        System.out.println("\n=== AUDIT LOG TAIL ===");
+        printAuditTail(5);
+
+        DatabaseConnection.getInstance().close();
+    }
+
+    private static void persistAll() {
+        // ordine ce respecta cheile straine: ranks -> worlds -> players, plus items, plugins, achievements
+        for (Rank r : List.of(guestRank, vipRank, modRank, adminRank)) {
+            rankDAO.save(r);
+        }
+        for (World w : List.of(survival, creative, minigames)) {
+            worldDAO.save(w);
+        }
+        // playerii primesc UUID nou la fiecare rulare a scenariului; curatam intai randurile vechi
+        for (Player existing : playerDAO.findAll()) {
+            playerDAO.delete(existing.getUuid());
+        }
+        for (Player p : state.getPlayers().values()) {
+            playerDAO.save(p);
+        }
+        for (Item item : List.of(diamondPickaxe, ironSword, bread, healingPotion, stone, diamondOre)) {
+            itemDAO.save(item);
+        }
+        // achievement parinte inaintea copilului (FK parent_id)
+        for (Achievement a : List.of(firstLogin, firstKill, legendary)) {
+            achievementDAO.save(a);
+        }
+        // plugin-urile: parintii inaintea dependentilor
+        for (Plugin pl : List.of(corePlugin, economyPlugin, shopPlugin)) {
+            pluginDAO.save(pl);
+        }
+        System.out.println("Persisted ranks, worlds, players, items, achievements and plugins");
+    }
+
+    private static void crudDemo() {
+        // read: toti playerii din DB
+        System.out.println("\n-- playerDAO.findAll() --");
+        List<Player> dbPlayers = playerDAO.findAll();
+        for (Player p : dbPlayers) {
+            System.out.println("  " + p.getUsername() + " [" + p.getRoleLabel() + "] balance="
+                    + p.getBalance() + " playtime=" + p.getPlaytimeMinutes() + "min");
+        }
+
+        // read by id
+        System.out.println("\n-- worldDAO.findById(\"survival_main\") --");
+        Optional<World> w = worldDAO.findById("survival_main");
+        w.ifPresentOrElse(
+                world -> System.out.println("  Found: " + world),
+                () -> System.out.println("  Not found"));
+
+        // create / update / delete pe un plugin nou
+        System.out.println("\n-- Plugin CRUD lifecycle --");
+        Plugin testPlugin = new Plugin("TestPlugin", "0.1.0", "QA");
+        pluginDAO.save(testPlugin);
+        System.out.println("  CREATE: " + pluginDAO.findById("TestPlugin").orElse(null));
+
+        testPlugin.setVersion("0.2.0");
+        pluginDAO.update(testPlugin);
+        System.out.println("  UPDATE: " + pluginDAO.findById("TestPlugin").orElse(null));
+
+        boolean deleted = pluginDAO.delete("TestPlugin");
+        System.out.println("  DELETE: removed=" + deleted
+                + ", present=" + pluginDAO.findById("TestPlugin").isPresent());
+
+        System.out.println("\n-- itemDAO.findAll() count: " + itemDAO.findAll().size() + " --");
+        System.out.println("-- achievementDAO.findAll() count: " + achievementDAO.findAll().size() + " --");
+
+        // folosire polimorfica prin interfata Repository: toate DAO-urile sunt tratate uniform, indiferent de tipul entitatii sau al cheii
+        System.out.println("\n-- Row counts via Repository interface --");
+        Map<String, Repository<?, ?>> repositories = new LinkedHashMap<>();
+        repositories.put("ranks", rankDAO);
+        repositories.put("worlds", worldDAO);
+        repositories.put("players", playerDAO);
+        repositories.put("items", itemDAO);
+        repositories.put("plugins", pluginDAO);
+        repositories.put("achievements", achievementDAO);
+        for (Map.Entry<String, Repository<?, ?>> entry : repositories.entrySet()) {
+            System.out.println("  " + entry.getKey() + ": " + entry.getValue().findAll().size());
+        }
+    }
+
+    private static void printAuditTail(int n) {
+        Path auditFile = Paths.get("audit.csv");
+        if (!Files.exists(auditFile)) {
+            System.out.println("No audit.csv found");
+            return;
+        }
+        try {
+            List<String> lines = Files.readAllLines(auditFile);
+            int from = Math.max(0, lines.size() - n);
+            System.out.println("Last " + Math.min(n, lines.size()) + " of " + lines.size() + " audit lines:");
+            for (int i = from; i < lines.size(); i++) {
+                System.out.println("  " + lines.get(i));
+            }
+        } catch (IOException e) {
+            System.out.println("Failed to read audit.csv: " + e.getMessage());
+        }
     }
 
     private static Rank guestRank, vipRank, modRank, adminRank;
