@@ -14,13 +14,17 @@ public class StaffService {
     }
 
     public void kickPlayer(StaffMember actor, Player target, String reason) {
-        AuditService.getInstance().logAction("KICK_PLAYER");
+        AuditService.getInstance().logAction("KICK_PLAYER",
+                "actor=" + actor.getUsername() + ";role=" + actor.getRoleLabel()
+                + ";target=" + target.getUsername() + ";reason=" + reason);
         actor.kick(target, reason);
         System.out.println("[STAFF] " + target.getUsername() + " was kicked from the server");
     }
 
     public void banPlayer(Administrator actor, Player target, String reason) {
-        AuditService.getInstance().logAction("BAN_PLAYER");
+        AuditService.getInstance().logAction("BAN_PLAYER",
+                "actor=" + actor.getUsername() + ";role=" + actor.getRoleLabel()
+                + ";target=" + target.getUsername() + ";reason=" + reason);
         actor.ban(target, reason);
         state.getPlayers().remove(target.getUuid());
         state.getLeaderboard().remove(target);

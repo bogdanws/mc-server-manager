@@ -14,12 +14,14 @@ public class AchievementService {
     }
 
     public void registerAchievement(Achievement a) {
-        AuditService.getInstance().logAction("REGISTER_ACHIEVEMENT");
+        AuditService.getInstance().logAction("REGISTER_ACHIEVEMENT",
+                "id=" + a.getId() + ";title=" + a.getTitle() + ";xp=" + a.getXpReward());
         state.getAchievements().put(a.getId(), a);
     }
 
     public void grantAchievement(Player p, Achievement a) {
-        AuditService.getInstance().logAction("GRANT_ACHIEVEMENT");
+        AuditService.getInstance().logAction("GRANT_ACHIEVEMENT",
+                "player=" + p.getUsername() + ";achievement=" + a.getId() + ";xp=" + a.getXpReward());
         if (a.getParentAchievement() != null) {
             Set<Achievement> playerAchievements = state.getPlayerAchievements().get(p);
             if (playerAchievements == null || !playerAchievements.contains(a.getParentAchievement())) {

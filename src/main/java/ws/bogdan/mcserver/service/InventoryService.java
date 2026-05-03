@@ -17,7 +17,8 @@ public class InventoryService {
     }
 
     public void addItem(Player p, Item item, int count) {
-        AuditService.getInstance().logAction("ADD_ITEM");
+        AuditService.getInstance().logAction("ADD_ITEM",
+                "player=" + p.getUsername() + ";item=" + item.getDisplayName() + ";count=" + count);
         Inventory inventory = state.getInventories().get(p);
         if (inventory == null) {
             throw new IllegalStateException("No inventory found for player: " + p.getUsername());
@@ -26,7 +27,7 @@ public class InventoryService {
     }
 
     public List<Item> searchByRarity(Rarity r) {
-        AuditService.getInstance().logAction("SEARCH_BY_RARITY");
+        AuditService.getInstance().logAction("SEARCH_BY_RARITY", "rarity=" + r);
         List<Item> result = new ArrayList<>();
         for (Inventory inventory : state.getInventories().values()) {
             for (ItemStack stack : inventory.getStacks()) {
@@ -39,7 +40,7 @@ public class InventoryService {
     }
 
     public <T extends Item> List<T> searchByType(Class<T> type) {
-        AuditService.getInstance().logAction("SEARCH_BY_TYPE");
+        AuditService.getInstance().logAction("SEARCH_BY_TYPE", "type=" + type.getSimpleName());
         List<T> result = new ArrayList<>();
         for (Inventory inventory : state.getInventories().values()) {
             for (ItemStack stack : inventory.getStacks()) {

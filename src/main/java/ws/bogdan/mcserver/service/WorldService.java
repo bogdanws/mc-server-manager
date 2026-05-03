@@ -15,13 +15,16 @@ public class WorldService {
     }
 
     public World createWorld(World w) {
-        AuditService.getInstance().logAction("CREATE_WORLD");
+        AuditService.getInstance().logAction("CREATE_WORLD",
+                "name=" + w.getName() + ";type=" + w.getWorldType()
+                + ";difficulty=" + w.getDifficulty() + ";maxPlayers=" + w.getMaxPlayers());
         state.getWorlds().put(w.getName(), w);
         return w;
     }
 
     public void teleportPlayer(Player p, String worldName) {
-        AuditService.getInstance().logAction("TELEPORT_PLAYER");
+        AuditService.getInstance().logAction("TELEPORT_PLAYER",
+                "player=" + p.getUsername() + ";destination=" + worldName);
         World destination = state.getWorlds().get(worldName);
         if (destination == null) {
             throw new PlayerNotFoundException("World not found: " + worldName);
@@ -35,7 +38,7 @@ public class WorldService {
     }
 
     public Map<String, Integer> worldStats() {
-        AuditService.getInstance().logAction("WORLD_STATS");
+        AuditService.getInstance().logAction("WORLD_STATS", "worldCount=" + state.getWorlds().size());
         Map<String, Integer> stats = new HashMap<>();
         for (World w : state.getWorlds().values()) {
             stats.put(w.getName(), w.getOnlinePlayers().size());

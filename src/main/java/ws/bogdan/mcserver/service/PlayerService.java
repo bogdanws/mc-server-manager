@@ -21,7 +21,8 @@ public class PlayerService {
     }
 
     public Player addPlayer(Player p) {
-        AuditService.getInstance().logAction("ADD_PLAYER");
+        AuditService.getInstance().logAction("ADD_PLAYER",
+                "player=" + p.getUsername() + ";uuid=" + p.getUuid() + ";rank=" + p.getRank().getName());
         state.getPlayers().put(p.getUuid(), p);
         state.getLeaderboard().add(p);
         state.getPlayersByRank()
@@ -47,14 +48,17 @@ public class PlayerService {
     }
 
     public void addPlaytime(Player p, long minutes) {
-        AuditService.getInstance().logAction("ADD_PLAYTIME");
+        AuditService.getInstance().logAction("ADD_PLAYTIME",
+                "player=" + p.getUsername() + ";minutes=" + minutes);
         state.getLeaderboard().remove(p);
         p.addPlaytime(minutes);
         state.getLeaderboard().add(p);
     }
 
     public void promoteTo(StaffMember actor, Player target, Rank newRank) {
-        AuditService.getInstance().logAction("PROMOTE_PLAYER");
+        AuditService.getInstance().logAction("PROMOTE_PLAYER",
+                "actor=" + actor.getUsername() + ";target=" + target.getUsername()
+                + ";oldRank=" + target.getRank().getName() + ";newRank=" + newRank.getName());
         if (actor.getPermissionLevel() < 50) {
             throw new PermissionDeniedException(
                     actor.getUsername() + " does not have permission to promote players");
@@ -71,7 +75,7 @@ public class PlayerService {
     }
 
     public List<Player> topNByPlaytime(int n) {
-        AuditService.getInstance().logAction("TOP_N_PLAYTIME");
+        AuditService.getInstance().logAction("TOP_N_PLAYTIME", "n=" + n);
         List<Player> result = new ArrayList<>();
         for (Player p : state.getLeaderboard()) {
             if (result.size() >= n)
