@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 
 public final class AuditService {
     private static final String CSV_FILE = "audit.csv";
-    private static final String HEADER = "action_name,details,timestamp";
+    private static final String HEADER = "action_name,timestamp";
 
     private static AuditService instance;
 
@@ -41,18 +41,14 @@ public final class AuditService {
         return instance;
     }
 
-    public void logAction(String actionName, String details) {
+    public void logAction(String actionName) {
         try {
-            writer.write(actionName + "," + details + "," + LocalDateTime.now());
+            writer.write(actionName + "," + LocalDateTime.now());
             writer.newLine();
             writer.flush();
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to write audit entry: " + actionName, e);
         }
-    }
-
-    public void logAction(String actionName) {
-        logAction(actionName, "");
     }
 
     public void close() {

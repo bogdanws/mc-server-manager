@@ -19,9 +19,7 @@ public class EconomyService {
     }
 
     public Transaction executeTransaction(Player buyer, Player seller, ItemStack stack, double price) {
-        AuditService.getInstance().logAction("EXECUTE_TRANSACTION",
-                "buyer=" + buyer.getUsername() + ";seller=" + seller.getUsername()
-                + ";item=" + stack.item().getDisplayName() + ";qty=" + stack.count() + ";price=" + price);
+        AuditService.getInstance().logAction("EXECUTE_TRANSACTION");
         if (buyer.getBalance() < price) {
             throw new InsufficientBalanceException(
                     buyer.getUsername() + " has insufficient balance: " + buyer.getBalance() + " < " + price);
@@ -44,14 +42,14 @@ public class EconomyService {
     }
 
     public List<Player> topRichestPlayers(int n) {
-        AuditService.getInstance().logAction("TOP_RICHEST", "n=" + n);
+        AuditService.getInstance().logAction("TOP_RICHEST");
         List<Player> sorted = new ArrayList<>(state.getPlayers().values());
         sorted.sort(Comparator.comparingDouble(Player::getBalance).reversed());
         return sorted.subList(0, Math.min(n, sorted.size()));
     }
 
     public List<Transaction> mostExpensiveTransactions(int n) {
-        AuditService.getInstance().logAction("MOST_EXPENSIVE_TRANSACTIONS", "n=" + n);
+        AuditService.getInstance().logAction("MOST_EXPENSIVE_TRANSACTIONS");
         List<Transaction> sorted = new ArrayList<>(state.getTransactionHistory());
         sorted.sort(Comparator.comparingDouble(Transaction::price).reversed());
         return sorted.subList(0, Math.min(n, sorted.size()));

@@ -16,8 +16,7 @@ public class SessionService {
     }
 
     public Session login(Player p, World w) {
-        AuditService.getInstance().logAction("LOGIN_PLAYER",
-                "player=" + p.getUsername() + ";uuid=" + p.getUuid() + ";world=" + w.getName());
+        AuditService.getInstance().logAction("LOGIN_PLAYER");
         w.addPlayer(p);
         p.setCurrentWorld(w);
         Session session = new Session(p, w);
@@ -26,8 +25,7 @@ public class SessionService {
     }
 
     public void logout(Player p) {
-        AuditService.getInstance().logAction("LOGOUT_PLAYER",
-                "player=" + p.getUsername() + ";uuid=" + p.getUuid());
+        AuditService.getInstance().logAction("LOGOUT_PLAYER");
         Iterator<Session> it = state.getActiveSessions().iterator();
         while (it.hasNext()) {
             Session session = it.next();

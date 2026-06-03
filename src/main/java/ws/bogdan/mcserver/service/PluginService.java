@@ -12,8 +12,7 @@ public class PluginService {
     }
 
     public void installPlugin(Plugin p) {
-        AuditService.getInstance().logAction("INSTALL_PLUGIN",
-                "name=" + p.getName() + ";version=" + p.getVersion() + ";author=" + p.getAuthor());
+        AuditService.getInstance().logAction("INSTALL_PLUGIN");
         for (Plugin dep : p.getDependencies()) {
             boolean satisfied = state.getPlugins().stream()
                     .anyMatch(installed -> installed.equals(dep) && installed.isEnabled());
@@ -29,7 +28,7 @@ public class PluginService {
     }
 
     public void disablePlugin(String name) {
-        AuditService.getInstance().logAction("DISABLE_PLUGIN", "name=" + name);
+        AuditService.getInstance().logAction("DISABLE_PLUGIN");
         Plugin target = state.getPlugins().stream()
                 .filter(p -> p.getName().equals(name) && p.isEnabled())
                 .findFirst()
