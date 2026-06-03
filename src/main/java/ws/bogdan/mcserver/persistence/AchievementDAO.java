@@ -5,10 +5,14 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 
 public final class AchievementDAO extends GenericDAO<Achievement, String> {
     private static AchievementDAO instance;
@@ -120,6 +124,36 @@ public final class AchievementDAO extends GenericDAO<Achievement, String> {
         Achievement a = new Achievement(row.id, row.title, row.description, row.xpReward, parent);
         resolved.put(id, a);
         return a;
+    }
+
+    // Player-achievement grants
+
+    // inregistreaza ca un player a fost premiat cu un achievement
+    public void saveGrant(UUID playerUuid, String achievementId) {
+        String sql = "INSERT OR IGNORE INTO player_achievements(player_uuid, achievement_id) VALUES (?, ?)";
+        try (PreparedStatement ps = prepare(sql)) {
+            ps.setString(1, playerUuid.toString());
+            ps.setString(2, achievementId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to save achievement grant", e);
+        }
+    }
+
+    // returneaza achievement-urile unui player
+    public Map<UUID, Set<String>> loadAllGrants() {
+        Map<UUID, Set<String>> result = new HashMap<>();
+        String sql = "SELECT player_uuid, achievement_id FROM player_achievements";
+        try (PreparedStatement ps = prepare(sql); ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                UUID uuid = UUID.fromString(rs.getString("player_uuid"));
+                result.computeIfAbsent(uuid, k -> new HashSet<>())
+                      .add(rs.getString("achievement_id"));
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to load achievement grants", e);
+        }
+        return Collections.unmodifiableMap(result);
     }
 
     private static final class Row {

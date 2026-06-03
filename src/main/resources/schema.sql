@@ -74,3 +74,11 @@ CREATE TABLE IF NOT EXISTS achievements (
     parent_id TEXT,
     FOREIGN KEY (parent_id) REFERENCES achievements(id)
 );
+
+CREATE TABLE IF NOT EXISTS player_achievements (
+    player_uuid TEXT NOT NULL,
+    achievement_id TEXT NOT NULL,
+    PRIMARY KEY (player_uuid, achievement_id),
+    FOREIGN KEY (player_uuid) REFERENCES players(uuid) ON DELETE CASCADE,
+    FOREIGN KEY (achievement_id) REFERENCES achievements(id)
+);

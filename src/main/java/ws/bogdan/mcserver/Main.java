@@ -1,35 +1,11 @@
 package ws.bogdan.mcserver;
 
-import ws.bogdan.mcserver.model.Achievement;
-import ws.bogdan.mcserver.model.ItemStack;
-import ws.bogdan.mcserver.model.Plugin;
-import ws.bogdan.mcserver.model.Rank;
-import ws.bogdan.mcserver.model.Transaction;
-import ws.bogdan.mcserver.model.World;
-import ws.bogdan.mcserver.model.enums.Difficulty;
-import ws.bogdan.mcserver.model.enums.Rarity;
-import ws.bogdan.mcserver.model.enums.WorldType;
-import ws.bogdan.mcserver.model.item.BuildingBlock;
-import ws.bogdan.mcserver.model.item.Food;
-import ws.bogdan.mcserver.model.item.Item;
-import ws.bogdan.mcserver.model.item.OreBlock;
-import ws.bogdan.mcserver.model.item.Pickaxe;
-import ws.bogdan.mcserver.model.item.Potion;
-import ws.bogdan.mcserver.model.item.Sword;
-import ws.bogdan.mcserver.model.item.Tool;
-import ws.bogdan.mcserver.model.player.Administrator;
-import ws.bogdan.mcserver.model.player.Moderator;
-import ws.bogdan.mcserver.model.player.Player;
-import ws.bogdan.mcserver.model.player.RegularPlayer;
-import ws.bogdan.mcserver.model.player.VIPPlayer;
-import ws.bogdan.mcserver.exception.PluginDependencyException;
 import ws.bogdan.mcserver.persistence.AchievementDAO;
 import ws.bogdan.mcserver.persistence.DatabaseConnection;
 import ws.bogdan.mcserver.persistence.ItemDAO;
 import ws.bogdan.mcserver.persistence.PlayerDAO;
 import ws.bogdan.mcserver.persistence.PluginDAO;
 import ws.bogdan.mcserver.persistence.RankDAO;
-import ws.bogdan.mcserver.persistence.Repository;
 import ws.bogdan.mcserver.persistence.WorldDAO;
 import ws.bogdan.mcserver.service.AchievementService;
 import ws.bogdan.mcserver.service.EconomyService;
@@ -40,412 +16,51 @@ import ws.bogdan.mcserver.service.ServerState;
 import ws.bogdan.mcserver.service.SessionService;
 import ws.bogdan.mcserver.service.StaffService;
 import ws.bogdan.mcserver.service.WorldService;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import ws.bogdan.mcserver.tui.ConsoleApp;
+import ws.bogdan.mcserver.tui.DatabaseBootstrap;
 
 public class Main {
 
-    static ServerState state;
-    static PlayerService playerService;
-    static WorldService worldService;
-    static InventoryService inventoryService;
-    static EconomyService economyService;
-    static AchievementService achievementService;
-    static PluginService pluginService;
-    static SessionService sessionService;
-    static StaffService staffService;
-
-    static RankDAO rankDAO;
-    static WorldDAO worldDAO;
-    static PlayerDAO playerDAO;
-    static ItemDAO itemDAO;
-    static PluginDAO pluginDAO;
-    static AchievementDAO achievementDAO;
-
-    // Players
-    static Player alice, bob, charlie, diana, mod, admin;
-
-    // Worlds
-    static World survival, creative, minigames;
-
-    // Items
-    static Pickaxe diamondPickaxe;
-    static Sword ironSword;
-    static Food bread;
-    static Potion healingPotion;
-    static BuildingBlock stone;
-    static OreBlock diamondOre;
-
-    // Plugins
-    static Plugin corePlugin, economyPlugin, shopPlugin;
-
-    // Achievements
-    static Achievement firstLogin, firstKill, legendary;
-
     public static void main(String[] args) {
-        System.out.println("\n=== INIT DATABASE ===");
-        DatabaseConnection.getInstance().runSchema();
-        rankDAO = RankDAO.getInstance();
-        worldDAO = WorldDAO.getInstance();
-        playerDAO = PlayerDAO.getInstance();
-        itemDAO = ItemDAO.getInstance();
-        pluginDAO = PluginDAO.getInstance();
-        achievementDAO = AchievementDAO.getInstance();
-        System.out.println("Database initialised");
+        // conectare la baza de date
+        DatabaseConnection db = DatabaseConnection.getInstance();
+        db.runSchema();
 
-        state = new ServerState();
-        playerService = new PlayerService(state);
-        worldService = new WorldService(state);
-        inventoryService = new InventoryService(state);
-        economyService = new EconomyService(state);
-        achievementService = new AchievementService(state);
-        pluginService = new PluginService(state);
-        sessionService = new SessionService(state, playerService);
-        staffService = new StaffService(state);
+        // DAO
+        RankDAO rankDAO = RankDAO.getInstance();
+        WorldDAO worldDAO = WorldDAO.getInstance();
+        PlayerDAO playerDAO = PlayerDAO.getInstance();
+        ItemDAO itemDAO = ItemDAO.getInstance();
+        PluginDAO pluginDAO = PluginDAO.getInstance();
+        AchievementDAO achDAO = AchievementDAO.getInstance();
 
-        System.out.println("\n=== SETUP RANKS ===");
-        setupRanks();
+        // scriere date default daca baza de date e goala
+        DatabaseBootstrap bootstrap = new DatabaseBootstrap(
+                rankDAO, worldDAO, playerDAO, pluginDAO, itemDAO, achDAO);
+        bootstrap.seedIfEmpty();
 
-        System.out.println("\n=== SETUP WORLDS ===");
-        setupWorlds();
+        ServerState state = new ServerState();
+        bootstrap.loadIntoState(state);
 
-        System.out.println("\n=== SETUP PLAYERS ===");
-        setupPlayers();
+        // servicii
+        PlayerService playerService = new PlayerService(state);
+        WorldService worldService = new WorldService(state);
+        InventoryService inventoryService = new InventoryService(state);
+        EconomyService economyService = new EconomyService(state);
+        AchievementService achievementService = new AchievementService(state);
+        PluginService pluginService = new PluginService(state);
+        SessionService sessionService = new SessionService(state, playerService);
+        StaffService staffService = new StaffService(state);
 
-        System.out.println("\n=== LOGIN PLAYERS ===");
-        loginPlayers();
+        // TUI
+        ConsoleApp app = new ConsoleApp(
+                state,
+                playerService, worldService, pluginService, sessionService, economyService,
+                achievementService,
+                playerDAO, worldDAO, pluginDAO, rankDAO, achDAO);
+        app.run();
 
-        System.out.println("\n=== POPULATE INVENTORIES ===");
-        populateInventories();
-
-        System.out.println("\n=== ADD PLAYTIME ===");
-        addPlaytime();
-
-        System.out.println("\n=== DEMO ECONOMY ===");
-        demoEconomy();
-
-        System.out.println("\n=== DEMO ACHIEVEMENTS ===");
-        demoAchievements();
-
-        System.out.println("\n=== DEMO PLUGINS ===");
-        demoPlugins();
-
-        System.out.println("\n=== DEMO STAFF ===");
-        demoStaff();
-
-        System.out.println("\n=== REPORTS ===");
-        printReports();
-
-        System.out.println("\n=== LOGOUT PLAYERS ===");
-        logoutPlayers();
-
-        System.out.println("\n=== PERSIST TO DATABASE ===");
-        persistAll();
-
-        System.out.println("\n=== CRUD DEMO ===");
-        crudDemo();
-
-        System.out.println("\n=== AUDIT LOG TAIL ===");
-        printAuditTail(5);
-
-        DatabaseConnection.getInstance().close();
-    }
-
-    private static void persistAll() {
-        // ordine ce respecta cheile straine: ranks -> worlds -> players, plus items, plugins, achievements
-        for (Rank r : List.of(guestRank, vipRank, modRank, adminRank)) {
-            rankDAO.save(r);
-        }
-        for (World w : List.of(survival, creative, minigames)) {
-            worldDAO.save(w);
-        }
-        // playerii primesc UUID nou la fiecare rulare a scenariului; curatam intai randurile vechi
-        for (Player existing : playerDAO.findAll()) {
-            playerDAO.delete(existing.getUuid());
-        }
-        for (Player p : state.getPlayers().values()) {
-            playerDAO.save(p);
-        }
-        for (Item item : List.of(diamondPickaxe, ironSword, bread, healingPotion, stone, diamondOre)) {
-            itemDAO.save(item);
-        }
-        // achievement parinte inaintea copilului (FK parent_id)
-        for (Achievement a : List.of(firstLogin, firstKill, legendary)) {
-            achievementDAO.save(a);
-        }
-        // plugin-urile: parintii inaintea dependentilor
-        for (Plugin pl : List.of(corePlugin, economyPlugin, shopPlugin)) {
-            pluginDAO.save(pl);
-        }
-        System.out.println("Persisted ranks, worlds, players, items, achievements and plugins");
-    }
-
-    private static void crudDemo() {
-        // read: toti playerii din DB
-        System.out.println("\n-- playerDAO.findAll() --");
-        List<Player> dbPlayers = playerDAO.findAll();
-        for (Player p : dbPlayers) {
-            System.out.println("  " + p.getUsername() + " [" + p.getRoleLabel() + "] balance="
-                    + p.getBalance() + " playtime=" + p.getPlaytimeMinutes() + "min");
-        }
-
-        // read by id
-        System.out.println("\n-- worldDAO.findById(\"survival_main\") --");
-        Optional<World> w = worldDAO.findById("survival_main");
-        w.ifPresentOrElse(
-                world -> System.out.println("  Found: " + world),
-                () -> System.out.println("  Not found"));
-
-        // create / update / delete pe un plugin nou
-        System.out.println("\n-- Plugin CRUD lifecycle --");
-        Plugin testPlugin = new Plugin("TestPlugin", "0.1.0", "QA");
-        pluginDAO.save(testPlugin);
-        System.out.println("  CREATE: " + pluginDAO.findById("TestPlugin").orElse(null));
-
-        testPlugin.setVersion("0.2.0");
-        pluginDAO.update(testPlugin);
-        System.out.println("  UPDATE: " + pluginDAO.findById("TestPlugin").orElse(null));
-
-        boolean deleted = pluginDAO.delete("TestPlugin");
-        System.out.println("  DELETE: removed=" + deleted
-                + ", present=" + pluginDAO.findById("TestPlugin").isPresent());
-
-        System.out.println("\n-- itemDAO.findAll() count: " + itemDAO.findAll().size() + " --");
-        System.out.println("-- achievementDAO.findAll() count: " + achievementDAO.findAll().size() + " --");
-
-        // folosire polimorfica prin interfata Repository: toate DAO-urile sunt tratate uniform, indiferent de tipul entitatii sau al cheii
-        System.out.println("\n-- Row counts via Repository interface --");
-        Map<String, Repository<?, ?>> repositories = new LinkedHashMap<>();
-        repositories.put("ranks", rankDAO);
-        repositories.put("worlds", worldDAO);
-        repositories.put("players", playerDAO);
-        repositories.put("items", itemDAO);
-        repositories.put("plugins", pluginDAO);
-        repositories.put("achievements", achievementDAO);
-        for (Map.Entry<String, Repository<?, ?>> entry : repositories.entrySet()) {
-            System.out.println("  " + entry.getKey() + ": " + entry.getValue().findAll().size());
-        }
-    }
-
-    private static void printAuditTail(int n) {
-        Path auditFile = Paths.get("audit.csv");
-        if (!Files.exists(auditFile)) {
-            System.out.println("No audit.csv found");
-            return;
-        }
-        try {
-            List<String> lines = Files.readAllLines(auditFile);
-            int from = Math.max(0, lines.size() - n);
-            System.out.println("Last " + Math.min(n, lines.size()) + " of " + lines.size() + " audit lines:");
-            for (int i = from; i < lines.size(); i++) {
-                System.out.println("  " + lines.get(i));
-            }
-        } catch (IOException e) {
-            System.out.println("Failed to read audit.csv: " + e.getMessage());
-        }
-    }
-
-    private static Rank guestRank, vipRank, modRank, adminRank;
-
-    private static void setupRanks() {
-        guestRank = new Rank("GUEST", "[G]", "&7", new HashSet<>(), 1);
-        vipRank = new Rank("VIP", "[V]", "&6", new HashSet<>(Set.of("vip.homes", "vip.fly")), 10);
-        modRank = new Rank("MOD", "[M]", "&b", new HashSet<>(Set.of("mod.kick", "mod.mute")), 50);
-        adminRank = new Rank("ADMIN", "[A]", "&c", new HashSet<>(Set.of("admin.ban", "admin.op")), 100);
-        System.out.println("Created ranks: GUEST, VIP, MOD, ADMIN");
-    }
-
-    private static void setupWorlds() {
-        survival = worldService
-                .createWorld(new World("survival_main", 12345L, WorldType.SURVIVAL, Difficulty.NORMAL, 50, 0, 64, 0));
-        creative = worldService
-                .createWorld(new World("creative_hub", 67890L, WorldType.CREATIVE, Difficulty.PEACEFUL, 20, 0, 64, 0));
-        minigames = worldService
-                .createWorld(new World("minigames", 11111L, WorldType.ADVENTURE, Difficulty.EASY, 100, 0, 64, 0));
-        System.out.println("Created worlds: survival_main, creative_hub, minigames");
-    }
-
-    private static void setupPlayers() {
-        alice = playerService.addPlayer(new RegularPlayer("Alice", guestRank));
-        bob = playerService.addPlayer(new RegularPlayer("Bob", guestRank));
-        charlie = playerService.addPlayer(new RegularPlayer("Charlie", guestRank));
-        diana = playerService.addPlayer(new VIPPlayer("Diana", vipRank, 3));
-        mod = playerService.addPlayer(new Moderator("ModSteve", modRank, "STAFF-001"));
-        admin = playerService.addPlayer(new Administrator("AdminJoe", adminRank, "STAFF-002"));
-        System.out.println(
-                "Registered 6 players: Alice, Bob, Charlie (GUEST), Diana (VIP), ModSteve (MOD), AdminJoe (ADMIN)");
-    }
-
-    private static void loginPlayers() {
-        sessionService.login(alice, survival);
-        sessionService.login(bob, survival);
-        sessionService.login(charlie, survival);
-        sessionService.login(diana, survival);
-        sessionService.login(mod, creative);
-        sessionService.login(admin, creative);
-        System.out.println("Alice, Bob, Charlie, Diana logged into survival_main");
-        System.out.println("ModSteve, AdminJoe logged into creative_hub");
-    }
-
-    private static void populateInventories() {
-        diamondPickaxe = new Pickaxe("minecraft:diamond_pickaxe", "Diamond Pickaxe", 1, Rarity.RARE, 1561, "DIAMOND");
-        ironSword = new Sword("minecraft:iron_sword", "Iron Sword", 1, Rarity.UNCOMMON, 250, "IRON", 6);
-        bread = new Food("minecraft:bread", "Bread", 64, Rarity.COMMON, 5, null);
-        healingPotion = new Potion("minecraft:potion_healing", "Potion of Healing", 1, Rarity.UNCOMMON, 0,
-                "REGENERATION", 30);
-        stone = new BuildingBlock("minecraft:stone", "Stone", 64, Rarity.COMMON, 1, true);
-        diamondOre = new OreBlock("minecraft:diamond_ore", "Diamond Ore", 64, Rarity.EPIC, 3, false, "DIAMOND", 7);
-
-        inventoryService.addItem(alice, diamondPickaxe, 1);
-        inventoryService.addItem(alice, bread, 32);
-        inventoryService.addItem(bob, ironSword, 1);
-        inventoryService.addItem(bob, stone, 64);
-        inventoryService.addItem(charlie, healingPotion, 1);
-        inventoryService.addItem(charlie, bread, 16);
-        inventoryService.addItem(diana, diamondOre, 8);
-        inventoryService.addItem(diana, ironSword, 1);
-
-        System.out.println("Inventories populated");
-
-        // demonstrate item usage
-        diamondPickaxe.use();
-        ironSword.use();
-        bread.consume();
-        healingPotion.consume();
-        diamondOre.mine();
-    }
-
-    private static void addPlaytime() {
-        playerService.addPlaytime(alice, 240);
-        playerService.addPlaytime(bob, 180);
-        playerService.addPlaytime(charlie, 300);
-        playerService.addPlaytime(diana, 420);
-        playerService.addPlaytime(mod, 150);
-        playerService.addPlaytime(admin, 90);
-        System.out.println("Playtime added to all players");
-    }
-
-    private static void demoEconomy() {
-        alice.addBalance(500.0);
-        diana.addBalance(1000.0);
-        bob.addBalance(200.0);
-
-        System.out.println("Alice balance: " + alice.getBalance());
-        System.out.println("Bob balance (before sale): " + bob.getBalance());
-
-        ItemStack swordStack = state.getInventories().get(bob).getStacks().get(0);
-        Transaction t = economyService.executeTransaction(alice, bob, swordStack, 150.0);
-        System.out.println("Transaction: " + t.buyer().getUsername() + " bought "
-                + t.itemStack().item().getDisplayName() + " from " + t.seller().getUsername()
-                + " for " + t.price() + " coins");
-        System.out.println("Alice balance after: " + alice.getBalance());
-        System.out.println("Bob balance after: " + bob.getBalance());
-    }
-
-    private static void demoAchievements() {
-        firstLogin = new Achievement("first_login", "First Login", "Log in for the first time", 10, null);
-        firstKill = new Achievement("first_kill", "First Blood", "Kill your first mob", 25, firstLogin);
-        legendary = new Achievement("legendary", "Legendary", "Reach legendary status", 100, null);
-
-        achievementService.registerAchievement(firstLogin);
-        achievementService.registerAchievement(firstKill);
-        achievementService.registerAchievement(legendary);
-
-        achievementService.grantAchievement(alice, firstLogin);
-        achievementService.grantAchievement(alice, firstKill);
-        achievementService.grantAchievement(diana, firstLogin);
-        achievementService.grantAchievement(diana, legendary);
-
-        try {
-            achievementService.grantAchievement(bob, firstKill);
-        } catch (IllegalStateException e) {
-            System.out.println("Expected error: " + e.getMessage());
-        }
-    }
-
-    private static void demoPlugins() {
-        corePlugin = new Plugin("CorePlugin", "1.0.0", "DevTeam");
-        economyPlugin = new Plugin("EconomyPlugin", "2.1.0", "DevTeam");
-        shopPlugin = new Plugin("ShopPlugin", "1.5.0", "DevTeam");
-
-        economyPlugin.addDependency(corePlugin);
-        shopPlugin.addDependency(corePlugin);
-        shopPlugin.addDependency(economyPlugin);
-
-        pluginService.installPlugin(corePlugin);
-        pluginService.installPlugin(economyPlugin);
-        pluginService.installPlugin(shopPlugin);
-
-        try {
-            pluginService.disablePlugin("CorePlugin");
-        } catch (PluginDependencyException e) {
-            System.out.println("Expected error: " + e.getMessage());
-        }
-
-        pluginService.disablePlugin("ShopPlugin");
-        pluginService.disablePlugin("EconomyPlugin");
-        pluginService.disablePlugin("CorePlugin");
-    }
-
-    private static void demoStaff() {
-        Moderator modSteve = (Moderator) mod;
-        Administrator adminJoe = (Administrator) admin;
-
-        staffService.kickPlayer(modSteve, charlie, "Spamming in chat");
-        playerService.promoteTo(adminJoe, bob, vipRank);
-        System.out.println("Bob promoted to: " + bob.getRank().getName());
-        staffService.banPlayer(adminJoe, charlie, "Repeated offenses");
-        System.out.println("Players remaining: " + state.getPlayers().size());
-    }
-
-    private static void printReports() {
-        System.out.println("\n-- Top 5 by Playtime --");
-        List<Player> top5 = playerService.topNByPlaytime(5);
-        for (int i = 0; i < top5.size(); i++) {
-            Player p = top5.get(i);
-            System.out.println((i + 1) + ". " + p.getUsername() + " - " + p.getPlaytimeMinutes() + " min");
-        }
-
-        System.out.println("\n-- Players by Rank --");
-        for (Map.Entry<Rank, Set<Player>> entry : state.getPlayersByRank().entrySet()) {
-            System.out.print(entry.getKey().getName() + ": ");
-            entry.getValue().forEach(p -> System.out.print(p.getUsername() + " "));
-            System.out.println();
-        }
-
-        System.out.println("\n-- Top 3 Richest --");
-        List<Player> richest = economyService.topRichestPlayers(3);
-        for (int i = 0; i < richest.size(); i++) {
-            Player p = richest.get(i);
-            System.out.println((i + 1) + ". " + p.getUsername() + " - " + p.getBalance() + " coins");
-        }
-
-        System.out.println("\n-- World Stats --");
-        worldService.worldStats().forEach((name, count) -> System.out.println(name + ": " + count + " players online"));
-
-        System.out.println("\n-- Rare Items --");
-        List<Item> rareItems = inventoryService.searchByRarity(Rarity.RARE);
-        rareItems.forEach(item -> System.out.println(item.getDisplayName() + " [" + item.getRarity() + "]"));
-
-        System.out.println("\n-- All Tools --");
-        List<Tool> tools = inventoryService.searchByType(Tool.class);
-        tools.forEach(t -> System.out.println(t.getDisplayName() + " - " + t.describe()));
-    }
-
-    private static void logoutPlayers() {
-        for (Player p : List.of(alice, bob, diana, mod, admin)) {
-            if (p.getCurrentWorld() != null) {
-                sessionService.logout(p);
-                System.out.println(p.getUsername() + " logged out");
-            }
-        }
+        // inchidere conexiune
+        db.close();
     }
 }
